@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 
+	namespace：必须与对应的接口全类名一致
+	id:必须与对应接口的某个对应的方法名一致
+ -->
+
+<mapper namespace="com.jk.mapper.user.UserMapper">
+	<insert id="saveFile" parameterType="fileBean">
+		insert into t_5a_file(id,name,REAL_PATH,HTTP_PATH,TYPE,UPLOAD_TIME,USER_ID,PID)
+		values(#{id},#{fileName},#{realPath},#{httpPath},#{type},sysdate,#{userId},#{pid})
+	</insert>
+	<!-- 新建文件夹 -->
+	<insert id="saveFolder" parameterType="fileBean">
+		insert into t_5a_file(id,name,pid,upload_time) values(#{id},#{fileName},#{pid},sysdate)
+	</insert>
+	<!-- 获取用户信息列表 -->
+	<select id="getUserListByIds" parameterType="string" resultType="userBean">
+		select t.id,
+               t.login_number as loginNumber,
+               t.name,
+               t.password,
+               t.sex,
+               t.email,
+               t.head_img as headImg,
+               to_char(t.registertime,'yyyy-MM-dd hh24:mi:ss') as registertime,
+               t.u_level as ulevel,
+               td.name as showDeptName,
+               t.status,
+               t.real_path as realPath
+          from t_5a_user t
+          left join T_5A_DICTIONARY td on t.dept_id = td.id
+         where td.type = 1
+         and t.id in
+         <foreach collection="array" open="(" close=")" separator="," item="id">
+         	#{id}
+         </foreach>
+         order by t.registertime desc
+	</select>
+	<!-- 获取文件列表 -->
+	<select id="getFileList" parameterType="string" resultType="fileBean">
+		select t.id,
+		       t.name as fileName,
+		       t.real_path as realPath,
+		       t.http_path as httpPath,
+		       t.type,
+		       to_char(t.upload_time, 'yyyy-MM-dd hh24:mi:ss') as uploadTime,
+		       t.sort
+		  from t_5a_file t
+		 where t.pid = #{id}
+		 order by t.upload_time desc
+	</select>
+	<!-- 上传excel -->
+	<insert id="addBatch" parameterType="list">
+		BEGIN
+			<foreach collection="list" index="index" item="item" separator=";">
+				insert into t_5a_user 
+				values(SEQ_5A_USER.Nextval,#{item.loginNumber},#{item.name},#{item.password},#{item.sex},#{item.email},'',to_date(#{item.registerTime},'YYYY-MM-dd'),1,#{item.deptId},#{item.status},'')
+			</foreach>
+		;END;
+	</insert>
+	<select id="getDeptListAll" resultType="deptBean">
+		select id,name as text,t.pid from t_5a_dictionary t where t.type=1
+	</select>
+	<!-- 获取用户列表 -->
+	<select id="getUserBakList" parameterType="userBean" resultType="userBean">
+		select *
+		  from (select a.*, rownum as rn
+		          from (select t.id,
+		                       t.login_number as loginNumber,
+		                       t.name,
+		                       t.password,
+		                       t.sex,
+		                       t.email,
+		                       t.head_img as headImg,
+		                       to_char(t.registertime,'yyyy-MM-dd hh24:mi:ss') as registertime,
+		                       t.u_level as ulevel,
+		                       td.name as showDeptName,
+		                       t.status
+		                  from t_5a_user t
+		                  left join T_5A_DICTIONARY td on t.dept_id = td.id
+		                 where td.type = 1
+		                 ) a
+		         where rownum &lt;= #{endIndex,jdbcType=NUMERIC})
+		 where rn > #{startIndex,jdbcType=NUMERIC}
+	</select>
+	<select id="getUserBakCount" parameterType="userBean" resultType="int">
+		select count(1) from t_5a_user
+	</select>
+
+	<!-- 获取详细权限 -->
+	<select id="getUserMenuPower" parameterType="int" resultType="menuBean">
+		select tm.id,tm.name,tm.url,tm.node from t_5a_menu tm 
+      left join t_5a_power_menu tpm on tm.id = tpm.menu_id
+      left join t_5a_tree t on tpm.power_id = t.id
+      left join t_5a_role_power trp on t.id = trp.power_id
+      left join t_5a_role tr on tr.id = trp.role_id
+      left join t_5a_user_role tur on tur.role_id = tr.id
+    where t.pid != '0'
+		   and tur.user_id = #{id}
+	
+	</select>
+
+	<!-- 查询我的登陆历史 -->
+	<select id="getMyLoginHistoryList" parameterType="int" resultType="loginHistoryBean">
+			select t.id,
+		       tu.name as userName,
+		       to_char(t.login_time, 'yyyy-MM-DD hh24:mi:ss') as loginTime,
+		       t.status,
+		       t.ip_addr as ipAddr,
+		       t.ip_real_addr as ipRealAddr,
+		       t.node
+		  from T_5A_LOGIN_HISTORY t
+		  left join t_5a_user tu on t.user_id = tu.id
+		  where t.user_id = #{id}
+		 order by t.login_time desc
+	</select>
+	<!-- 查询登陆历史 -->
+	<select id="getLoginHistoryList" resultType="loginHistoryBean">
+		select t.id,
+		       tu.name as userName,
+		       to_char(t.login_time, 'yyyy-MM-DD hh24:mi:ss') as loginTime,
+		       t.status,
+		       t.ip_addr as ipAddr,
+		       t.ip_real_addr as ipRealAddr,
+		       t.node
+		  from T_5A_LOGIN_HISTORY t
+		  left join t_5a_user tu on t.user_id = tu.id
+		 order by t.login_time desc
+	</select>
+	<!-- 保存登陆日志 -->
+	<insert id="saveLoginHistory" parameterType="loginHistoryBean">
+		insert into T_5A_LOGIN_HISTORY values(#{id},#{userId},sysdate,#{status},#{ipAddr},#{ipRealAddr},#{node})
+	</insert>
+	<!-- 通过登录账号获取用户信息 -->
+	<select id="getUserInfoByLoginNumber" parameterType="string" resultType="userBean">
+		select t.id,
+               t.login_number as loginNumber,
+               t.name,
+               t.password,
+               t.sex,
+               t.email,
+               t.head_img as headImg,
+               to_char(t.registertime,'yyyy-MM-dd hh24:mi:ss') as registertime,
+               t.u_level as ulevel,
+               t.status
+        from t_5a_user t
+        where t.login_number = #{loginNumber}
+	</select>
+	<!-- 删除权限菜单 -->
+	<delete id="delPowerMenuById" parameterType="string">
+		delete t_5a_power_menu where menu_id = #{id}
+	</delete>
+	<!-- 删除菜单 -->
+	<delete id="delMenuById" parameterType="string">
+		delete T_5A_MENU where id = #{id}
+	</delete>
+	<!-- 添加权限菜单关系 -->
+	<insert id="savePowerMenu" parameterType="map">
+		insert into t_5a_power_menu 
+		values(#{id,jdbcType=VARCHAR},#{powerId,jdbcType=VARCHAR},#{menuId,jdbcType=VARCHAR})
+	</insert>
+	<!-- 添加菜单权限 -->
+	<insert id="saveMenu" parameterType="menuBean">
+		insert into t_5a_menu(id,name,node,url) values(#{id},#{name},#{node},#{url})
+	</insert>
+	<!-- 查询权限的菜单权限 -->
+	<select id="getPowerMenu" parameterType="string" resultType="menuBean">
+		select t.name,t.id,t.url,t.node
+		  from t_5a_menu t
+		  left join T_5A_POWER_MENU tp on t.id = tp.menu_id
+		 where tp.power_id = #{powerId}
+	</select>
+	<!-- 删除权限 -->
+	<delete id="deletePowerById" parameterType="string">
+		delete t_5a_tree
+ 			where id in (select id
+                FROM t_5a_tree
+               START WITH id = #{id}
+              CONNECT BY pid = PRIOR id
+              )
+	</delete>
+	<!-- 修改权限 -->
+	<update id="updatePower" parameterType="powerTreeBean">
+		update t_5a_tree set text = #{text},url=#{url} where id = #{id}
+	</update>
+	<!-- 追加权限节点 -->
+	<insert id="savePower" parameterType="powerTreeBean">
+		insert into t_5a_tree values(#{id},#{text},#{url},#{pid},0)
+	</insert>
+	<!-- 删除角色的权限 -->
+	<delete id="deleteRolePowerByRoleId" parameterType="string">
+		delete t_5a_role_power where role_id = #{roleId}
+	</delete>
+	<!-- 查询角色权限通过角色id -->
+	<select id="getRolePowerByRoleId" parameterType="string" resultType="rolePowerBean">
+		select t.id,t.power_id as powerId,t.role_id as roleId from t_5a_role_power t where t.role_id = #{roleId}
+	</select>
+	<!-- 保存角色的权限 -->
+	<insert id="saveRolePower" parameterType="list">
+		BEGIN
+		<foreach collection="list" index="index" separator=";" item="rolePower">
+			insert into t_5a_role_power (id,role_id,power_id) 
+			values(#{rolePower.id},#{rolePower.roleId},#{rolePower.powerId})
+		</foreach>
+		;END;
+	</insert>
+	<!-- 获取权限树 -->
+	<select id="getPowerList" parameterType="string" resultType="powerTreeBean">
+		select t.id,t.text,t.url,t.pid from t_5a_tree t where t.pid = #{id}
+	</select>
+	<!-- 批量删除角色 -->
+	<delete id="delRoleByIds" parameterType="string">
+		delete t_5a_role where id in 
+		<foreach collection="array" open="(" close=")" separator="," item="id">
+			#{id}
+		</foreach>
+	</delete>
+	<!-- 修改角色 -->
+	<update id="updateRoleById" parameterType="roleBean">
+		update t_5a_role set name = #{name},node = #{node} where id = #{id}
+	</update>
+	<!-- 保存角色 -->
+	<insert id="saveRole" parameterType="roleBean">
+		insert into t_5a_role values(#{id},#{name},#{node},sysdate)
+	</insert>
+	<!-- 查询角色 -->
+	<select id="getRoleList" resultType="roleBean">
+		select * from t_5a_role order by time desc
+	</select>
+	<!-- 解冻用户 -->
+	<update id="unlockUserById" parameterType="string">
+		update t_5a_user t set t.status = 0 where t.id = #{id}
+	</update>
+	<!-- 冻结用户 -->
+	<update id="lockUserById" parameterType="string">
+		update t_5a_user t set t.status = 1 where t.id = #{id}
+	</update>
+	<!-- 修改 -->
+	<update id="updateUserById" parameterType="userBean">
+		update t_5a_user t
+		   set t.login_number = #{loginNumber},
+		       t.name         = #{name},
+		       t.sex          = #{sex},
+		       t.email        = #{email},
+		       t.head_img     = #{headImg},
+		       t.dept_id      = #{deptId}
+		 where t.id = #{id}
+	</update>
+	<!-- 修改回填 -->
+	<select id="getUserInfoById" parameterType="string" resultType="userBean">
+		select t.id,
+               t.login_number as loginNumber,
+               t.name,
+               t.password,
+               t.sex,
+               t.email,
+               t.head_img as headImg,
+               to_char(t.registertime,'yyyy-MM-dd hh24:mi:ss') as registertime,
+               t.u_level as ulevel,
+               t.dept_id as deptId,
+               t.status
+          from t_5a_user t
+          where t.id = #{id}
+	</select>
+	
+	<!-- 批量删除 -->
+	<delete id="deleteUserByIds" parameterType="string">
+		delete t_5a_user t where t.id in 
+		<foreach collection="array" open="(" close=")" separator="," item="id">
+			#{id}
+		</foreach>
+	</delete>
+	
+	<!-- 添加用户角色 -->
+	<insert id="saveUserRole" parameterType="map">
+		insert into t_5a_user_role 
+		values(#{id,jdbcType=VARCHAR},#{userId,jdbcType=NUMERIC},#{roleId,jdbcType=VARCHAR})
+	</insert>
+	<!-- 添加用户 -->
+	<insert id="saveUser" parameterType="userBean">
+	   <selectKey resultType="int" order="BEFORE" keyProperty="id">  
+	       SELECT SEQ_5A_USER.Nextval as id from DUAL  
+	   </selectKey>
+		insert into t_5a_user values(#{id,jdbcType=NUMERIC},#{loginNumber},#{name},#{password},#{sex},#{email},#{headImg},sysdate,1,#{deptId},0)
+	</insert>
+	
+	<!-- 获取部门字段 -->
+	<select id="getDeptList" parameterType="int" resultType="deptBean">
+		select id,name as text,t.pid from t_5a_dictionary t where t.type=1 and t.pid = #{value}
+	</select>
+	<!-- 查询用户列表 -->
+	<select id="getUserList" parameterType="userBean" resultType="userBean">
+		select *
+		  from (select a.*, rownum as rn
+		          from (select t.id,
+		                       t.login_number as loginNumber,
+		                       t.name,
+		                       t.password,
+		                       t.sex,
+		                       t.email,
+		                       t.head_img as headImg,
+		                       to_char(t.registertime,'yyyy-MM-dd hh24:mi:ss') as registertime,
+		                       t.u_level as ulevel,
+		                       td.name as showDeptName,
+		                       t.status
+		                  from t_5a_user t
+		                  left join T_5A_DICTIONARY td on t.dept_id = td.id
+		                 where td.type = 1
+		                 <include refid="where"></include>
+		                 order by t.registertime desc
+		                 ) a
+		         where rownum &lt;= #{endIndex,jdbcType=NUMERIC})
+		 where rn > #{startIndex,jdbcType=NUMERIC}
+	</select>
+	<!-- 查询用户数量 -->
+	<select id="getUserCount" parameterType="userBean" resultType="int">
+		select count(1)
+		  from t_5a_user t
+		  left join T_5A_DICTIONARY td on t.dept_id = td.id
+		where td.type = 1
+		<include refid="where"></include>
+	</select>
+	<!-- 搜索公共部分 -->
+	<sql id="where">
+		<if test="name != '' and name != null">
+			and t.name like '%' || #{name,jdbcType=VARCHAR} || '%'
+		</if>
+	</sql>
+	
+	<select id="test" resultType="int">
+		select count(1) from dual
+	</select>
+</mapper>

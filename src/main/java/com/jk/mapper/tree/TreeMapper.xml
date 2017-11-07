@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 
+	namespace：必须与对应的接口全类名一致
+	id:必须与对应接口的某个对应的方法名一致
+ -->
+
+<mapper namespace="com.jk.mapper.tree.TreeMapper">
+	<select id="getNavigationTree" parameterType="int" resultType="treeBean">
+		select t.id,t.text as name,t.url as pathUrl,t.pid as pId,t.open
+		  from t_5a_tree t
+		  left join t_5a_role_power trp on t.id = trp.power_id
+		  left join t_5a_role tr on tr.id = trp.role_id
+		  left join t_5a_user_role tur on tur.role_id = tr.id
+		where t.pid != '0'
+		   and tur.user_id = #{id}
+	</select>
+</mapper>
