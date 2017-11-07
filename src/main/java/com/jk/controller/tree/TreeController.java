@@ -33,6 +33,7 @@ public class TreeController {
 	@RequestMapping(value="getNavigationTree.do",method=RequestMethod.POST)
 	@ResponseBody
 	public List<TreeBean> getNavigationTree(HttpServletRequest request){
+		System.out.println("123");
 		HttpSession session = request.getSession();
 		UserBean userBean = (UserBean) session.getAttribute(session.getId());
 		logger.info("获取session信息="+userBean.toString());
